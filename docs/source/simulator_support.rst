@@ -667,8 +667,11 @@ In order to use this simulator, set :make:var:`SIM` to ``enzan``:
 .. code-block:: bash
 
     make SIM=enzan
+    # or
+    SIM=enzan [...] pytest [...]
 
-This simulator is not currently supported in the :ref:`Python Runner <howto-python-runner>` flow.
+For simulator-specific limitations when running with the :ref:`Python Runner <howto-python-runner>` flow,
+see :class:`cocotb_tools.runner.Enzan`.
 
 .. note::
 

@@ -33,6 +33,7 @@ _SIMULATORS: dict[str, str] = {
     "nvc": "nvc",
     "ghdl": "ghdl",
     "iverilog": "icarus",
+    "enzan": "enzan",
     # proprietary simulators
     "xrun": "xcelium",
     "vcs": "vcs",

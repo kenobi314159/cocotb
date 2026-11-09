@@ -71,8 +71,8 @@ def run_simulation(sim, extra_build_args=None, test_args=None):
 
 @pytest.mark.simulator_required
 @pytest.mark.skipif(
-    sim not in ["icarus", "verilator", "xcelium", "nvc", "ghdl"],
-    reason="Skipping test because it is only for Icarus, Verilator, Xcelium, NVC, and GHDL simulators",
+    sim not in ["icarus", "verilator", "xcelium", "nvc", "ghdl", "enzan"],
+    reason="Skipping test because it is only for Icarus, Verilator, Xcelium, NVC, GHDL, and Enzan simulators",
 )
 def test_wave_dump():
     run_simulation(sim=sim)
@@ -86,6 +86,8 @@ def test_wave_dump():
         dumpfile_path = sim_build / f"{hdl_toplevel}.fst"
     elif sim == "ghdl":
         dumpfile_path = sim_build / f"{hdl_toplevel}.ghw"
+    elif sim == "enzan":
+        dumpfile_path = sim_build / f"{hdl_toplevel}.fst"
     else:
         raise RuntimeError("Not a supported simulator")
     assert dumpfile_path.exists()

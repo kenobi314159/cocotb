@@ -138,6 +138,8 @@ Simulator Runners
 
 .. autoclass:: Dsim
 
+.. autoclass:: Enzan
+
 Results
 -------
 

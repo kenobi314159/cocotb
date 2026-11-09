@@ -10,6 +10,7 @@
 # TODO: support custom dependencies
 from __future__ import annotations
 
+import json
 import logging
 import multiprocessing
 import os
@@ -2434,6 +2435,232 @@ class Dsim(Runner):
         return cmds
 
 
+class Enzan(Runner):
+    """Implementation of :class:`Runner` for Enzan.
+
+    .. admonition:: Simulator-specific Usage
+
+       * :meth:`~Runner.build` analyses the VHDL sources into a library named *hdl_library*,
+         against the libraries that earlier calls built,
+         and records the (System)Verilog sources.
+       * :meth:`~Runner.test` analyses the (System)Verilog sources, elaborates the design and runs it in a single call,
+         so errors in (System)Verilog sources are reported by :meth:`~Runner.test`.
+         The VHDL of *hdl_toplevel_library* is analysed again in that call when the design contains (System)Verilog,
+         and (System)Verilog can only instantiate VHDL from that library.
+       * The time unit and the time precision of ``timescale`` must be the same,
+         and one of ``1s``, ``1ms``, ``1us``, ``1ns``, ``1ps``, or ``1fs``,
+         since Enzan counts time in a single unit.
+       * Only one *hdl_toplevel* is supported.
+         Further top levels can be added with ``test_args=["--top", "<name>"]``.
+       * ``gui=True`` runs the simulation in Enzan's graphical front end,
+         which runs the tests once the simulation is started from it.
+       * Does not support the ``pre_cmd`` argument to :meth:`~Runner.test`.
+    """
+
+    supported_gpi_interfaces: ClassVar[dict[str, list[str]]] = {
+        "verilog": ["vpi"],
+        "vhdl": ["vhpi"],
+    }
+
+    def _simulator_in_path(self) -> None:
+        if shutil.which("enzan") is None:
+            raise SystemExit("ERROR: enzan executable not found!")
+
+    def _set_env_test(self) -> None:
+        super()._set_env_test()
+        self.env["GPI_IMPL"] = cocotb_tools.config.gpi_impl(
+            "enzan", *self.gpi_interfaces
+        )
+
+    def _get_include_options(self, includes: Sequence[PathLike]) -> _Command:
+        return [option for include in includes for option in ("-I", str(include))]
+
+    def _get_define_options(self, defines: Mapping[str, object]) -> _Command:
+        return [
+            option
+            for name, value in defines.items()
+            for option in ("-D", f"{name}={value}")
+        ]
+
+    def _get_parameter_options(self, parameters: Mapping[str, object]) -> _Command:
+        return [f"-G{name}={value}" for name, value in parameters.items()]
+
+    def _waves_file(self) -> str | None:
+        return f"{self.sim_hdl_toplevel}.fst"
+
+    def _get_timescale_options(self, timescale: Sequence[str] | None) -> _Command:
+        if timescale is None:
+            return []
+        unit, precision = ("".join(value.split()) for value in timescale)
+        match = re.fullmatch(r"1(s|ms|us|ns|ps|fs)", precision)
+        if unit != precision or match is None:
+            raise ValueError(
+                f"{type(self).__qualname__} counts time in a single unit, so the time unit and the time precision "
+                f"must be the same, and one of 1s, 1ms, 1us, 1ns, 1ps, or 1fs; got timescale={tuple(timescale)!r}."
+            )
+        return ["--timescale", match.group(1)]
+
+    def _in_build_dir(self, name: str) -> Path:
+        assert self.build_dir is not None
+        return self.build_dir / name
+
+    @property
+    def _build_record(self) -> Path:
+        return self._in_build_dir("enzan_build.json")
+
+    def _read_build_record(self) -> list[dict[str, Any]]:
+        """Return what each call of :meth:`~Runner.build` recorded, in the order of the calls."""
+        try:
+            with open(self._build_record) as f:
+                return json.load(f)["libraries"]
+        except FileNotFoundError:
+            return []
+
+    def _get_library_options(self, libraries: Iterable[dict[str, Any]]) -> _Command:
+        # Named explicitly, since Enzan reads `--in-lib <name>=<dir>` and a path may contain "=".
+        return [
+            option
+            for library in libraries
+            if library["vhdl_sources"]
+            for option in (
+                "--in-lib",
+                f"{library['name']}={self._in_build_dir(library['name'])}",
+            )
+        ]
+
+    def _build_command(self) -> list[_Command]:
+        sources = self._sources + self._vhdl_sources + self._verilog_sources
+
+        for source in sources:
+            if source.tag not in (VHDL, Verilog):
+                raise ValueError(
+                    f"{type(self).__qualname__} only supports VHDL and Verilog. {str(source.value)!r} cannot be compiled."
+                )
+
+        timescale_options = self._get_timescale_options(self.timescale)
+        vhdl_sources = [str(source.value) for source in sources if source.tag is VHDL]
+        vhdl_args = [arg.value for arg in self._build_args if arg.tag in (VHDL, None)]
+
+        library = {
+            "name": self.hdl_library,
+            "verilog_sources": [
+                str(source.value) for source in sources if source.tag is Verilog
+            ],
+            "vhdl_sources": vhdl_sources,
+            "verilog_args": self._get_define_options(self.defines)
+            + self._get_include_options(self.includes)
+            + [arg.value for arg in self._build_args if arg.tag in (Verilog, None)],
+            "vhdl_args": vhdl_args,
+            "parameters": {name: str(value) for name, value in self.parameters.items()},
+            "timescale": self.timescale,
+        }
+
+        # A library built again replaces its record, and is analysed against the others.
+        libraries = [
+            other
+            for other in self._read_build_record()
+            if other["name"] != self.hdl_library
+        ]
+
+        cmds: list[_Command] = []
+        if vhdl_sources:
+            cmds.append(
+                [
+                    "enzan",
+                    "analyse",
+                    "--out-lib",
+                    str(self._in_build_dir(self.hdl_library)),
+                    *self._get_library_options(libraries),
+                    *timescale_options,
+                    *vhdl_args,
+                    *vhdl_sources,
+                ]
+            )
+
+        with open(self._build_record, "w") as f:
+            json.dump({"libraries": [*libraries, library]}, f, indent=2)
+
+        return cmds
+
+    def _test_command(self) -> list[_Command]:
+        if self.pre_cmd is not None:
+            raise RuntimeError("pre_cmd is not implemented for Enzan.")
+
+        libraries = self._read_build_record()
+        toplevel_library = next(
+            (
+                library
+                for library in libraries
+                if library["name"] == self.hdl_toplevel_library
+            ),
+            None,
+        )
+
+        # What test() is given takes precedence over what build() recorded.
+        timescale = self.timescale or next(
+            (library["timescale"] for library in libraries if library["timescale"]),
+            None,
+        )
+        parameters = self.parameters or (
+            toplevel_library["parameters"] if toplevel_library is not None else {}
+        )
+
+        gpi_entry = self.gpi_interfaces[0]
+        options = [
+            "--top",
+            self.sim_hdl_toplevel,
+            *self._get_timescale_options(timescale),
+            f"--{gpi_entry}",
+            cocotb_tools.config.lib_entry(gpi_entry, "enzan"),
+            *self._get_parameter_options(parameters),
+            *(["--fst", str(self._waves_file())] if self.waves else []),
+            *(["--gui"] if self.gui else []),
+            *self.elab_args,
+            *self.test_args,
+        ]
+
+        verilog_sources = [
+            source for library in libraries for source in library["verilog_sources"]
+        ]
+        if not verilog_sources:
+            # A VHDL design runs from the libraries build() analysed it into.
+            cmd = ["enzan", "run", *self._get_library_options(libraries), *options]
+        else:
+            # (System)Verilog finds VHDL only among the sources analysed with it,
+            # so the VHDL of the toplevel library is analysed again with it.
+            vhdl_sources, vhdl_args = (
+                (toplevel_library["vhdl_sources"], toplevel_library["vhdl_args"])
+                if toplevel_library is not None
+                else ([], [])
+            )
+            cmd = [
+                "enzan",
+                *self._get_library_options(
+                    library for library in libraries if library is not toplevel_library
+                ),
+                *(["--work", self.hdl_toplevel_library] if vhdl_sources else []),
+                *(
+                    arg
+                    for library in libraries
+                    if library["verilog_sources"]
+                    for arg in library["verilog_args"]
+                ),
+                *(vhdl_args if vhdl_sources else []),
+                *options,
+                *verilog_sources,
+                *vhdl_sources,
+            ]
+
+        return [
+            [
+                *self._get_sim_cmd_prefix(),
+                *cmd,
+                *self.plusargs,
+                *self._get_sim_cmd_suffix(),
+            ]
+        ]
+
+
 SUPPORTED_RUNNERS: dict[str, type[Runner]] = {
     "icarus": Icarus,
     "questa": Questa,
@@ -2446,6 +2673,7 @@ SUPPORTED_RUNNERS: dict[str, type[Runner]] = {
     "nvc": Nvc,
     "vcs": Vcs,
     "dsim": Dsim,
+    "enzan": Enzan,
 }
 """
 Dictionary mapping of simulator names to corresponding Python runners.
