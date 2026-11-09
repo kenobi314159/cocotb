@@ -222,3 +222,30 @@ Siemens DSim
 * Extend the ``dsim`` call with the option
   ``-pli_lib $(cocotb-config --lib-entry vpi dsim) +acc+rwcbfsWF``.
 * Set :envvar:`GPI_IMPL` to ``$(cocotb-config --gpi-impl dsim vpi)``.
+
+.. _custom-flows-enzan:
+
+Enzan
+=====
+
+.. tab-set::
+
+   .. tab-item:: Design with a VHDL Toplevel
+
+      For a design with a VHDL toplevel, call ``enzan`` with the option
+      ``--vhpi $(cocotb-config --lib-entry vhpi enzan)``.
+
+      Set the :envvar:`GPI_IMPL` environment variable to
+      ``$(cocotb-config --gpi-impl enzan vhpi)``.
+      If there are also (System)Verilog modules in the design, use
+      ``$(cocotb-config --gpi-impl enzan vhpi vpi)``.
+
+   .. tab-item:: Design with a (System)Verilog Toplevel
+
+      For a design with a (System)Verilog toplevel, call ``enzan`` with the option
+      ``--vpi $(cocotb-config --lib-entry vpi enzan)``.
+
+      Set the :envvar:`GPI_IMPL` environment variable to
+      ``$(cocotb-config --gpi-impl enzan vpi)``.
+      If there are also VHDL modules in the design, use
+      ``$(cocotb-config --gpi-impl enzan vpi vhpi)``.

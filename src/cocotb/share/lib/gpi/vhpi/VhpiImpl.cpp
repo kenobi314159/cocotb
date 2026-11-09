@@ -15,7 +15,7 @@
 #include "_vendor/vhpi/vhpi_user.h"
 #include "vhpi_user_ext.h"
 
-#ifdef NVC
+#if defined(NVC) || defined(ENZAN)
 #include <algorithm>
 #endif
 
@@ -298,9 +298,10 @@ bool is_enum_boolean(vhpiHandleT hdl) {
 }
 
 static bool compare_names(const std::string &a, const std::string &b) {
-#ifdef NVC
+#if defined(NVC) || defined(ENZAN)
     /* NVC does not properly implement the CaseName property and returns
-       Names instead (nickg/nvc#723). */
+       Names instead (nickg/nvc#723). Enzan returns the CaseName of a region
+       in upper case. */
     return a.size() == b.size() &&
            equal(a.begin(), a.end(), b.begin(), [](char x, char y) {
                return std::toupper(x) == std::toupper(y);
@@ -546,7 +547,7 @@ static std::string fully_qualified_name(const std::string &name,
     } else {
         fq_name += "." + name;
     }
-#ifdef NVC
+#if defined(NVC) || defined(ENZAN)
     /* Convert to a canonical form to avoid problems with case insensitivity. */
     std::transform(fq_name.begin(), fq_name.end(), fq_name.begin(), ::toupper);
 #endif

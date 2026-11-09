@@ -170,6 +170,7 @@ def _gpi_impl_path(interface: str, simulator: str) -> Path:
         "cvc",
         "nvc",
         "dsim",
+        "enzan",
     ]
     if simulator not in supported_sims:
         raise ValueError(

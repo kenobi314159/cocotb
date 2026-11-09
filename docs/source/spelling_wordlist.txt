@@ -5,6 +5,7 @@ Altera
 Avalon
 Cosimulation
 Deprecations
+Enzan
 FLI
 GPI
 GTKWave
