@@ -51,7 +51,7 @@ Make Variables
 
 .. make:var:: WAVES
 
-      Set this to 1 to enable wave traces dump for the Aldec Riviera-PRO, Mentor Graphics Questa, and Icarus Verilog simulators.
+      Set this to 1 to enable wave traces dump for the Aldec Riviera-PRO, Mentor Graphics Questa, Icarus Verilog, and Enzan simulators.
       To get wave traces in Verilator see :ref:`sim-verilator-waveforms`.
 
 .. make:var:: TOPLEVEL_LANG
@@ -86,11 +86,11 @@ Make Variables
 
 .. make:var:: VHDL_SOURCES_<lib>
 
-      A list of the VHDL source files to include in the VHDL library *lib* (currently for GHDL/ModelSim/Questa/Xcelium/Incisive/Riviera-PRO only).
+      A list of the VHDL source files to include in the VHDL library *lib* (currently for GHDL/ModelSim/Questa/Xcelium/Incisive/Riviera-PRO/Enzan only).
 
 .. make:var:: VHDL_LIB_ORDER
 
-      A space-separated list defining the order in which VHDL libraries should be compiled (needed for ModelSim/Questa/Xcelium/Incisive, GHDL determines the order automatically).
+      A space-separated list defining the order in which VHDL libraries should be compiled (needed for ModelSim/Questa/Xcelium/Incisive/Enzan, GHDL determines the order automatically).
 
 .. make:var:: COMPILE_ARGS
 
@@ -150,7 +150,7 @@ Make Variables
 .. make:var:: TOPLEVEL_LIBRARY
 
     The name of the library that contains the :envvar:`COCOTB_TOPLEVEL` module/entity.
-    Only supported by the Aldec Riviera-PRO, Aldec Active-HDL, and Siemens EDA Questa simulators.
+    Only supported by the Aldec Riviera-PRO, Aldec Active-HDL, Siemens EDA Questa, and Enzan simulators.
 
 .. make:var:: PYTHON_BIN
 

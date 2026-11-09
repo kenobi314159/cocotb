@@ -1,0 +1,104 @@
+# Copyright cocotb contributors
+# Licensed under the Revised BSD License, see LICENSE for details.
+# SPDX-License-Identifier: BSD-3-Clause
+
+TOPLEVEL_LANG ?= verilog
+
+ifeq ($(filter verilog vhdl,$(TOPLEVEL_LANG)),)
+    $(error A valid value (verilog or vhdl) was not provided for TOPLEVEL_LANG=$(TOPLEVEL_LANG))
+endif
+
+CMD_BIN := enzan
+
+ifdef ENZAN_BIN_DIR
+    CMD := $(call find_command,$(ENZAN_BIN_DIR)/$(CMD_BIN))
+else
+    # auto-detect bin dir from system path
+    CMD := $(call find_command,$(CMD_BIN))
+endif
+
+# The toplevel's language's interface loads cocotb, and in a design of both
+# languages the other interface is loaded after it.
+ifeq ($(TOPLEVEL_LANG),verilog)
+    GPI_ARGS := --vpi $(shell $(PYTHON_BIN) -m cocotb_tools.config --lib-entry vpi enzan)
+    GPI_IMPL := $(shell $(PYTHON_BIN) -m cocotb_tools.config --gpi-impl enzan vpi)
+ifneq ($(strip $(VHDL_SOURCES)),)
+    GPI_IMPL := $(shell $(PYTHON_BIN) -m cocotb_tools.config --gpi-impl enzan vpi vhpi)
+endif
+else
+    GPI_ARGS := --vhpi $(shell $(PYTHON_BIN) -m cocotb_tools.config --lib-entry vhpi enzan)
+    GPI_IMPL := $(shell $(PYTHON_BIN) -m cocotb_tools.config --gpi-impl enzan vhpi)
+ifneq ($(strip $(VERILOG_SOURCES)),)
+    GPI_IMPL := $(shell $(PYTHON_BIN) -m cocotb_tools.config --gpi-impl enzan vhpi vpi)
+endif
+endif
+
+TOPLEVEL_LIBRARY ?= work
+
+ifneq ($(strip $(VHDL_SOURCES)),)
+    ENZAN_WORK := --work $(TOPLEVEL_LIBRARY)
+endif
+
+# Each library in VHDL_LIB_ORDER is analysed from its VHDL_SOURCES_<lib> into a
+# library of its own, in that order and against those before it, and the run
+# reads them all.
+ENZAN_LIBRARIES := $(SIM_BUILD)/enzan-libraries
+ENZAN_IN_LIBS := $(foreach LIB,$(VHDL_LIB_ORDER),--in-lib $(ENZAN_LIBRARIES)/$(LIB))
+
+TOPLEVELS := $(call deprecate,TOPLEVEL,COCOTB_TOPLEVEL)
+ifneq ($(words $(TOPLEVELS)),0)
+ifneq ($(words $(TOPLEVELS)),1)
+    $(error Enzan takes one COCOTB_TOPLEVEL, but $(words $(TOPLEVELS)) were given: $(TOPLEVELS); add other top levels with EXTRA_ARGS += --top <name>)
+endif
+    TOPMODULE_ARG := --top $(TOPLEVELS)
+endif
+
+# Enzan counts time in a single unit, which is also the time unit of a module
+# that states no timescale, so the precision has to be one of those units.
+ENZAN_TIMESCALE := $(patsubst 1%,%,$(strip $(COCOTB_HDL_TIMEPRECISION)))
+ifeq ($(filter s ms us ns ps fs,$(ENZAN_TIMESCALE)),)
+    $(error Enzan cannot count time in COCOTB_HDL_TIMEPRECISION=$(COCOTB_HDL_TIMEPRECISION); it takes 1s, 1ms, 1us, 1ns, 1ps or 1fs)
+endif
+
+ifdef VERILOG_INCLUDE_DIRS
+    COMPILE_ARGS += $(addprefix -I ,$(VERILOG_INCLUDE_DIRS))
+endif
+
+ifeq ($(WAVES),1)
+    ENZAN_WAVES := --fst $(SIM_BUILD)/$(TOPLEVELS).fst
+endif
+
+ENZAN_ARGS = $(TOPMODULE_ARG) --timescale $(ENZAN_TIMESCALE) $(GPI_ARGS) $(ENZAN_WORK) \
+             $(ENZAN_IN_LIBS) $(ENZAN_WAVES) $(COMPILE_ARGS) $(SIM_ARGS) $(EXTRA_ARGS) \
+             $(VERILOG_SOURCES) $(VHDL_SOURCES) $(call deprecate,PLUSARGS,COCOTB_PLUSARGS)
+
+ifneq ($(strip $(VHDL_LIB_ORDER)),)
+define enzan_analyse_libraries
+	$(RM) -r $(ENZAN_LIBRARIES)
+	set -e; against=""; $(foreach LIB,$(VHDL_LIB_ORDER),$(CMD) lib create --name $(LIB) $(ENZAN_LIBRARIES)/$(LIB) >/dev/null; $(CMD) analyse --out-lib $(ENZAN_LIBRARIES)/$(LIB) $$against $(COMPILE_ARGS) $(VHDL_SOURCES_$(LIB)); against="$$against --in-lib $(ENZAN_LIBRARIES)/$(LIB)";) true
+endef
+endif
+
+# Analysis, elaboration and the run are one process, so there is no compiled
+# image to keep and the results file is the only target.
+$(COCOTB_RESULTS_FILE): $(VERILOG_SOURCES) $(VHDL_SOURCES) $(CUSTOM_COMPILE_DEPS) $(CUSTOM_SIM_DEPS) | $(SIM_BUILD)
+	$(RM) $(COCOTB_RESULTS_FILE)
+	$(foreach LIB, $(VHDL_LIB_ORDER), $(check_vhdl_sources))
+	$(foreach SOURCES_VAR, $(filter VHDL_SOURCES_%, $(.VARIABLES)), $(check_lib_order))
+	$(enzan_analyse_libraries)
+
+	GPI_IMPL=$(GPI_IMPL) $(COCOTB_ENV) \
+	$(SIM_CMD_PREFIX) $(CMD) $(ENZAN_ARGS) $(SIM_CMD_SUFFIX)
+
+	$(call check_results)
+
+debug: $(VERILOG_SOURCES) $(VHDL_SOURCES) $(CUSTOM_COMPILE_DEPS) $(CUSTOM_SIM_DEPS) | $(SIM_BUILD)
+	$(RM) $(COCOTB_RESULTS_FILE)
+	$(foreach LIB, $(VHDL_LIB_ORDER), $(check_vhdl_sources))
+	$(foreach SOURCES_VAR, $(filter VHDL_SOURCES_%, $(.VARIABLES)), $(check_lib_order))
+	$(enzan_analyse_libraries)
+
+	GPI_IMPL=$(GPI_IMPL) $(COCOTB_ENV) \
+	$(SIM_CMD_PREFIX) gdb --args $(CMD) $(ENZAN_ARGS) $(SIM_CMD_SUFFIX)
+
+	$(call check_results)

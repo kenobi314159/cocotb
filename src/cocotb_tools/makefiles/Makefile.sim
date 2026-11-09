@@ -31,11 +31,11 @@ Makefile-based Test Scripts
 ---------------------------
 GUI                       Set this to 1 to enable the GUI mode in the simulator
 SIM                       Selects which simulator Makefile to use
-WAVES                     Enable wave traces dump for Riviera-PRO and Questa
+WAVES                     Enable wave traces dump for Riviera-PRO, Questa and Enzan
 VERILOG_SOURCES           A list of the Verilog source files to include
 VHDL_SOURCES              A list of the VHDL source files to include
-VHDL_SOURCES_<lib>        VHDL source files to include in *lib* (GHDL/NVC/ModelSim/Questa/Xcelium/Incisive/Riviera-PRO only)
-VHDL_LIB_ORDER            Compilation order of VHDL libraries (needed for NVC/ModelSim/Questa/Xcelium/Incisive/Riviera-PRO)
+VHDL_SOURCES_<lib>        VHDL source files to include in *lib* (GHDL/NVC/ModelSim/Questa/Xcelium/Incisive/Riviera-PRO/Enzan only)
+VHDL_LIB_ORDER            Compilation order of VHDL libraries (needed for NVC/ModelSim/Questa/Xcelium/Incisive/Riviera-PRO/Enzan)
 SIM_CMD_PREFIX            Prefix for simulation command invocations
 COMPILE_ARGS              Arguments to pass to compile (analysis) stage of simulation
 SIM_ARGS                  Arguments to pass to execution of compiled simulation

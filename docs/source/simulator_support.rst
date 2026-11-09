@@ -652,3 +652,60 @@ Reported Issues for this Simulator
 * `All issues with label category:simulators:dsim <https://github.com/cocotb/cocotb/issues?q=is%3Aissue+-label%3Astatus%3Aduplicate+label%3Acategory%3Asimulators%3Adsim>`_
 
 .. versionadded:: 2.0
+
+.. _sim-enzan:
+
+Enzan
+=====
+
+.. note::
+
+    Enzan version **0.2.0** or later is required.
+
+In order to use this simulator, set :make:var:`SIM` to ``enzan``:
+
+.. code-block:: bash
+
+    make SIM=enzan
+
+This simulator is not currently supported in the :ref:`Python Runner <howto-python-runner>` flow.
+
+.. note::
+
+    A working installation of `Enzan <https://github.com/kenobi314159/Enzan-RTL-Simulator>`_ is required.
+    If ``enzan`` is not on the ``PATH``, set ``ENZAN_BIN_DIR`` to the directory containing it.
+
+Enzan supports both a (System)Verilog toplevel, which cocotb accesses through VPI,
+and a VHDL toplevel, which cocotb accesses through VHPI.
+A VHDL toplevel requires Enzan to be built with VHDL support.
+A design can contain both languages with either one as the toplevel.
+
+Enzan analyzes, elaborates, and runs the design in a single call,
+so :make:var:`COMPILE_ARGS`, :make:var:`SIM_ARGS`, and :make:var:`EXTRA_ARGS` are all passed to that call.
+
+Enzan counts simulation time in a single unit, set by :make:var:`COCOTB_HDL_TIMEPRECISION`,
+which must be one of ``1s``, ``1ms``, ``1us``, ``1ns``, ``1ps``, or ``1fs``.
+The same unit is the time unit of modules that do not specify one, so :make:var:`COCOTB_HDL_TIMEUNIT` is not used.
+
+Only one :envvar:`COCOTB_TOPLEVEL` is supported.
+Further top levels, such as a ``glbl`` module, can be added with ``EXTRA_ARGS += --top <name>``.
+
+.. versionadded:: 2.2
+
+.. _sim-enzan-waveforms:
+
+Waveforms
+---------
+
+Enzan can produce waveform traces in the FST format.
+They can be viewed with GTKWave or with `Surfer <https://surfer-project.org/>`_.
+
+To enable FST tracing, set :make:var:`WAVES` to ``1``.
+
+.. code-block:: bash
+
+    make SIM=enzan WAVES=1
+
+The wave file will be named :file:`<toplevel>.fst` and placed in the :make:var:`SIM_BUILD` directory.
+
+To get waveforms in VCD format instead, set the :make:var:`SIM_ARGS` option to ``--vcd anyname.vcd``.
