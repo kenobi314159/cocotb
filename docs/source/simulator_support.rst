@@ -690,6 +690,12 @@ The same unit is the time unit of modules that do not specify one, so :make:var:
 Only one :envvar:`COCOTB_TOPLEVEL` is supported.
 Further top levels, such as a ``glbl`` module, can be added with ``EXTRA_ARGS += --top <name>``.
 
+Set :make:var:`GUI` to ``1`` to run the simulation in Enzan's graphical front end,
+which is packaged separately as ``enzan-gui``.
+The window opens with the design and cocotb loaded, and the tests run once the simulation is started from it;
+add ``--run all`` to :make:var:`SIM_ARGS` to start it as soon as the window opens.
+Closing the window ends the simulation, and the results are checked then.
+
 .. versionadded:: 2.2
 
 .. _sim-enzan-waveforms:
